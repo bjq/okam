@@ -41,6 +41,8 @@ export default class ComputedObserver {
         this.computed = this.initComputedProps(computedInfo);
         this.watchComputed = {};
 
+        ctx.data || (ctx.data = {});
+
         let watcher = this.handleDepChange.bind(this);
         ctx.$dataListener.on('change', watcher);
         this.computedCounter = 0;
@@ -132,7 +134,7 @@ export default class ComputedObserver {
             result[k] = this.initDeps(k);
         });
 
-        this.ctx.$setData(result);
+        this.ctx.__setViewData(result);
     }
 
     /**
@@ -181,7 +183,7 @@ export default class ComputedObserver {
             : (old !== value || (typeof old === 'object'));
         if (neeUpdate) {
             ctx.data[p] = value;
-            ctx.$setData({[p]: value});
+            ctx.__setViewData({[p]: value});
             this.notifyWatcher(value, old, [p]);
         }
     }
@@ -294,7 +296,10 @@ export default class ComputedObserver {
      * @param {Array.<string>} paths the change data paths
      */
     notifyWatcher(newVal, oldVal, paths) {
-        let listener = this.ctx.$dataListener;
+        let ctx = this.ctx;
+        ctx.__onDataSet && ctx.__onDataSet(paths, newVal, oldVal);
+
+        let listener = ctx.$dataListener;
         listener && listener.emit('change', newVal, oldVal, paths);
     }
 
@@ -331,13 +336,17 @@ export default class ComputedObserver {
             value = ctx.data[k];
         }
 
+        // maybe the computed prop is dependence on other computed props which
+        // has not collected deps yet, we need to call getter to collect deps
         if (!this.deps[k]) {
             let getter = this.computed[k].getter;
             value = getter.call(ctx, ctx);
+            // watch computed props is not view data, so don't put it to data
             watchInfo || (ctx.data[k] = value);
         }
 
         this.addDep(k);
+        ctx.__onDataGet && ctx.__onDataGet([k]);
 
         return value;
     }

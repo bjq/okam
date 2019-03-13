@@ -7,10 +7,13 @@
 
 import {mixin, isFunction} from '../util/index';
 import {normalizeOkamProps} from './props';
+import {appGlobal} from '../na/index';
 
-let usedExtensions = Object.create(null);
-let installedPlugins = [];
-let baseClasses = Object.create(null);
+let pluginCache = {
+    usedExtensions: Object.create(null),
+    installedPlugins: [],
+    baseClasses: Object.create(null)
+};
 
 const APP_TYPE = 'app';
 const COMPONENT_TYPE = 'comp';
@@ -26,15 +29,23 @@ const PAGE_TYPE = 'page';
  * @return {Object}
  */
 function initExtensions(type, instance, base) {
-    let existedBase = baseClasses[type];
+    let cache = pluginCache;
+    if (process.env.APP_TYPE === 'quick') {
+        if (!appGlobal.okamPluginCache) {
+            appGlobal.okamPluginCache = pluginCache;
+        }
+        cache = appGlobal.okamPluginCache;
+    }
+
+    let existedBase = cache.baseClasses[type];
     if (!existedBase) {
-        let plugins = usedExtensions[type];
+        let plugins = cache.usedExtensions[type];
         let args = [{}];
         plugins && Array.prototype.push.apply(args, plugins);
         args.push(base);
 
         existedBase = mixin.apply(this, args);
-        baseClasses[type] = existedBase;
+        cache.baseClasses[type] = existedBase;
     }
 
     return mixin.apply(this, [instance, existedBase]);
@@ -52,10 +63,15 @@ function addExtension(type, extension) {
         return;
     }
 
-    let existedExtensions = usedExtensions[type];
+    let cache = pluginCache;
+    if (process.env.APP_TYPE === 'quick') {
+        cache = appGlobal.okamPluginCache;
+    }
+
+    let existedExtensions = cache.usedExtensions[type];
     /* istanbul ignore next */
     if (!existedExtensions) {
-        existedExtensions = usedExtensions[type] = [];
+        existedExtensions = cache.usedExtensions[type] = [];
     }
 
     existedExtensions.push(extension);
@@ -82,9 +98,11 @@ function initComponentData(instance, options, isPage) {
  * Clear the base class cache
  */
 export function clearBaseCache() {
-    baseClasses = {};
-    usedExtensions = {};
-    installedPlugins = [];
+    pluginCache = {
+        usedExtensions: {},
+        installedPlugins: [],
+        baseClasses: {}
+    };
 }
 
 /**
@@ -101,11 +119,17 @@ export function clearBaseCache() {
  * @return {boolean} return true if install successfully
  */
 export function use(plugin, pluginOpts) {
-    if (installedPlugins.indexOf(plugin) > -1) {
+    let cache = pluginCache;
+    // for quick app, should using global cache to avoid the cache missing
+    if (process.env.APP_TYPE === 'quick' && !appGlobal.okamPluginCache) {
+        appGlobal.okamPluginCache = pluginCache;
+    }
+
+    if (cache.installedPlugins.indexOf(plugin) > -1) {
         return false;
     }
 
-    pluginOpts && typeof plugin.init === 'function'
+    typeof plugin.init === 'function'
         && plugin.init(pluginOpts);
 
     let {component, page, app} = plugin;
@@ -117,7 +141,7 @@ export function use(plugin, pluginOpts) {
     addExtension(PAGE_TYPE, page);
     addExtension(APP_TYPE, app);
 
-    installedPlugins.push(plugin);
+    cache.installedPlugins.push(plugin);
     return true;
 }
 
@@ -126,10 +150,13 @@ export function use(plugin, pluginOpts) {
  *
  * @param {Object} instance the instance to init app
  * @param {Object} base the app base
+ * @param {Object=} options the extra init options
  * @return {Object}
  */
-export function createApp(instance, base) {
-    return initExtensions(APP_TYPE, instance, base);
+export function createApp(instance, base, options) {
+    let appInfo = initExtensions(APP_TYPE, instance, base);
+    options && (appInfo.$appOptions = () => options);
+    return appInfo;
 }
 
 /**

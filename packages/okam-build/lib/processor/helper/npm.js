@@ -1,5 +1,5 @@
 /**
- * @file Npm module helper
+ * @file Resource resolve helper including npm module resolve
  * @author xiaohong8023@outlook.com
  */
 
@@ -11,42 +11,44 @@ const DEP_DIR_NAME_REGEXP = new RegExp(DEP_DIR_NAME, 'g');
 const NEW_DEP_DIR_NAME = 'npm';
 
 /**
- * Check whether is npm module file
+ * Default dependence module directory name
  *
- * @param {string} modulePath the module relative path
- * @return {boolean}
+ * @const
+ * @type {string}
  */
-exports.isNpmModuleFile = function (modulePath) {
-    return modulePath.indexOf(DEP_DIR_NAME) === 0;
-};
+exports.DEFAULT_DEP_DIR_NAME = DEP_DIR_NAME;
 
 /**
  * Resolve npm module new path to output
  *
  * @param {string} oldPath the old module path
+ * @param {string} moduleDir the current module dir
  * @param {string} rebaseDepDir the dep directory to rebase
  * @return {string}
  */
-exports.resolveNpmModuleNewPath = function (oldPath, rebaseDepDir) {
-    let newPath = rebaseDepDir + oldPath.substr(DEP_DIR_NAME.length + 1);
-    // replace all `node_modles` to `npm` to fix weixin cannot find the module
+exports.resolveDepModuleNewPath = function (oldPath, moduleDir, rebaseDepDir) {
+    let newPath = rebaseDepDir + oldPath.substr(moduleDir.length);
+
+    // replace all `node_modules` to `npm` to fix weixin cannot find the module
     // if the module path exists `node_module` dir name
     let result = newPath.replace(
         DEP_DIR_NAME_REGEXP, NEW_DEP_DIR_NAME
     );
 
     // remove `src` to fix toutiao cannot init correctly
-    return result.replace('/src/', '/')
+    return result.replace(/\\/g, '/').replace('/src/', '/')
         .replace('/okam-core/', '/okam/')
+        .replace('/okam-component/', '/ocom/')
         .replace('/@babel/runtime/helpers/', '/babel/');
 };
 
 /**
- * Resolve required module id. If resolve fail, return empty.
+ * Resolve required module id or other resource file path.
+ * If resolve fail, return empty.
  *
  * @param {BuildManager} buildManager the build manager
  * @param {Object} file the file to host the required module id
- * @param {string} requireModId the required module id to resolve
+ * @param {string} requireModId the required module id or resource path to resolve
  * @return {?string}
  */
 exports.resolve = function (buildManager, file, requireModId) {
@@ -54,15 +56,21 @@ exports.resolve = function (buildManager, file, requireModId) {
         return requireModId;
     }
 
-    let {isNpm: isNpmMod, resolvedModIds: cacheResolveModIds} = file;
+    let {resolvedModIds: cacheResolveModIds} = file;
     cacheResolveModIds || (file.resolvedModIds = cacheResolveModIds = {});
     let resolveModInfo = cacheResolveModIds[requireModId];
     if (resolveModInfo) {
         return resolveModInfo.id;
     }
 
-    let isRelModId = requireModId.charAt(0) === '.';
-    let depFileFullPath = buildManager.resolve(requireModId, file);
+    let resolveOpts;
+    if (file.isStyle || file.isTpl) {
+        resolveOpts = {
+            extensions: []
+        };
+    }
+
+    let depFileFullPath = buildManager.resolve(requireModId, file, resolveOpts);
     if (!depFileFullPath) {
         return;
     }
@@ -77,17 +85,14 @@ exports.resolve = function (buildManager, file, requireModId) {
     file.isWxCompScript && (depFile.isWxCompScript = true);
     file.isSwanCompScript && (depFile.isSwanCompScript = true);
     file.isAntCompScript && (depFile.isAntCompScript = true);
+    file.isTTCompScript && (depFile.isTTCompScript = true);
 
-    let resolveModId = requireModId;
-    if (!isRelModId) {
-        let rebaseRelPath = isNpmMod
-            ? file.resolvePath
-            : file.path;
-        resolveModId = getRequirePath(
-            depFile.resolvePath || depFile.path,
-            rebaseRelPath
-        );
-    }
+    let rebaseRelPath = file.resolvePath || file.path;
+    let resolveModId = getRequirePath(
+        depFile.resolvePath || depFile.path,
+        rebaseRelPath,
+        (file.isStyle || file.isTpl) ? true : buildManager.getModulePathKeepExtnames()
+    );
 
     let cacheInfo = {
         id: resolveModId,

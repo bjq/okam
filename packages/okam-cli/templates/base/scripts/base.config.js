@@ -1,6 +1,8 @@
 /**
  * @file Build mini program base config
  * @author ${author|raw}
+ *
+ * @see https://ecomfe.github.io/okam/#/build/index
  */
 
 'use strict';
@@ -19,32 +21,39 @@ module.exports = {
     component: {
         extname: '${sfcExt}',
         template: {
+            // vue v- 前缀支持, 默认为 false
+            useVuePrefix: true,
             // 标签转换配置项
             transformTags: {
             }
         }
     },
+    // 此处没用上的功能可自行精简
     framework: [
         'data',
+        // watch 依赖 data
         'watch',
+        // 快应用 不支持 model
+        'model',
+        // 头条 不支持 filter
+        'filter',
         <% if: ${redux} %>
+        // redux 依赖 data
         'redux',
         <% /if %>
         'behavior',
         'broadcast',
         'ref'
     ],
+    // 快应用 不转 rpx
+    designWidth: 1242,
     processors: {
-        <% if: ${script} === 'typescript' %>
-        babel7: {
-            extnames: ['js', 'ts']
-        },
-        <% elif: ${script} === 'babel7' %>
-        babel7: {
+        <% if: ${script} === 'babel' %>
+        babel: {
             extnames: ['js']
         },
         <% else %>
-        babel: {
+        babel7: {
             extnames: ['js']
         },
         <% /if %>
@@ -71,14 +80,20 @@ module.exports = {
             extnames: ['${styleExt}'],
             options: {
                 <% if: ${px2rpx} %>
-                plugins: {
-                    px2rpx: {
-                        // 设计稿尺寸
-                        designWidth: 1242,
-                        // 开启 1px 不转
-                        noTrans1px: true
-                    }
-                }
+                plugins: [
+                    'env',
+                    [
+                        'px2rpx',
+                        {
+                            // 设计稿尺寸,
+                            // 此配置项优先级高于 外层的 `designWidth`
+                            // 相同时 内部配置项可以不配置
+                            // designWidth: 1242,
+                            // 开启 1px 不转
+                            noTrans1px: true
+                        }
+                    ]
+                ]
                 <% /if %>
             }
         }

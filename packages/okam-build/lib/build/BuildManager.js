@@ -9,7 +9,6 @@
 const pathUtil = require('path');
 const EventEmitter = require('events');
 const {colors, Timer, merge, babel: babelUtil, file: fileUtil} = require('../util');
-const {toHyphen} = require('../util').string;
 const loadProcessFiles = require('./load-process-files');
 const CacheManager = require('./CacheManager');
 const FileOutput = require('../generator/FileOutput');
@@ -19,6 +18,7 @@ const {getDefaultBabelProcessor} = require('../processor/helper/processor');
 const ModuleResolver = require('./ModuleResolver');
 const allAppTypes = require('./app-type');
 const cleanBuild = require('./clean-build');
+const initGlobalComponents = require('./global-component');
 
 class BuildManager extends EventEmitter {
     constructor(buildConf) {
@@ -62,24 +62,9 @@ class BuildManager extends EventEmitter {
      * @param {Object} componentConf the component config
      */
     initGlobalComponents(componentConf) {
-        let {global: globalComponents} = componentConf;
-        if (!globalComponents) {
-            return;
-        }
-
-        let result = {};
-        Object.keys(globalComponents).forEach(k => {
-            let value = globalComponents[k];
-            let isRelMod = value.charAt(0) === '.';
-            if (isRelMod) {
-                value = pathUtil.join(this.sourceDir, value);
-            }
-            result[toHyphen(k)] = {
-                isNpmMod: !isRelMod,
-                modPath: value
-            };
-        });
-        this.globalComponents = result;
+        this.globalComponents = initGlobalComponents(
+            this.appType, componentConf, this.sourceDir
+        );
     }
 
     /**
@@ -146,11 +131,15 @@ class BuildManager extends EventEmitter {
     }
 
     onAddNewFile(file) {
+        if (this.envFileUpdated) {
+            return;
+        }
+
         // replace module okam-core/na/index.js content using specified app env module
-        if (file.isNpm && file.path === 'node_modules/okam-core/src/na/index.js') {
+        if (file.path.indexOf('node_modules/okam-core/src/na/index.js') !== -1) {
             let naEnvModuleId = `../${this.appType}/env`;
             file.content = `'use strict;'\nexport * from '${naEnvModuleId}';\n`;
-            this.files.removeListener('addFile', this.addNewFileHandler);
+            this.envFileUpdated = true;
         }
     }
 
@@ -174,20 +163,22 @@ class BuildManager extends EventEmitter {
         this.addNewFileHandler = this.onAddNewFile.bind(this);
         files.on('addFile', this.addNewFileHandler);
 
-        let {output} = this.buildConf;
+        let {output, wx2swan, designWidth} = this.buildConf;
         this.compileContext = {
             cache: this.cache,
             resolve: npm.resolve.bind(null, this),
             addFile: this.addNewFile.bind(this),
             getFileByFullPath: this.getFileByFullPath.bind(this),
-            designWidth: this.buildConf.designWidth,
+            designWidth,
             appType: this.appType,
             allAppTypes,
             logger: this.logger,
             envConfigKey: this.envConfigKey,
             sourceDir,
             root,
-            output
+            output,
+            wx2swan,
+            componentExtname: this.componentExtname
         };
 
         this.initGlobalComponents(this.buildConf.component);
@@ -231,10 +222,11 @@ class BuildManager extends EventEmitter {
      * @param {string} requireModId the module id to require
      * @param {string|Object} file the full file path or virtual file object
      *        to require the given module id
+     * @param {Object=} opts the extra resolve options
      * @return {string}
      */
-    resolve(requireModId, file) {
-        return this.resolver.resolve(requireModId, file);
+    resolve(requireModId, file, opts) {
+        return this.resolver.resolve(requireModId, file, opts);
     }
 
     /**
@@ -249,6 +241,7 @@ class BuildManager extends EventEmitter {
      /**
      * Get the app base class init options
      *
+     * @param {Object} file the file to process
      * @param {Object} config the config info defined in config property
      * @param {Object} opts the options
      * @param {boolean=} opts.isApp whether is app instance init
@@ -256,8 +249,14 @@ class BuildManager extends EventEmitter {
      * @param {boolean=} opts.isComponent whether is component instance init
      * @return {?Object}
      */
-    getAppBaseClassInitOptions(config, opts) {
+    getAppBaseClassInitOptions(file, config, opts) {
         // do nothing, subclass should provide implementation if needed
+        // for model framework
+        if (!opts.isApp && this.isEnableModelSupport()) {
+            return {
+                isSupportObserve: this.isEnableFrameworkExtension('data')
+            };
+        }
         return null;
     }
 
@@ -275,6 +274,15 @@ class BuildManager extends EventEmitter {
                 usingBabel6: !isUsingBabel7
             };
         }
+        return null;
+    }
+
+    /**
+     * Get the module path resolve to keep path extnames
+     *
+     * @return {?Array.<string>}
+     */
+    getModulePathKeepExtnames() {
         return null;
     }
 
@@ -412,8 +420,20 @@ class BuildManager extends EventEmitter {
         return this.isEnableFrameworkExtension('ref');
     }
 
+    isEnableMixinSupport() {
+        return this.isEnableFrameworkExtension('behavior');
+    }
+
     isEnableFilterSupport() {
         return this.isEnableFrameworkExtension('filter');
+    }
+
+    isEnableModelSupport() {
+        return this.isEnableFrameworkExtension('model');
+    }
+
+    isEnableVHtmlSupport() {
+        return this.isEnableFrameworkExtension('vhtml');
     }
 
     getProcessFileCount() {
@@ -441,9 +461,10 @@ class BuildManager extends EventEmitter {
             return;
         }
 
-        let {content, deps, sourceMap, ast} = compileResult;
+        let {rext, content, deps, sourceMap, ast} = compileResult;
         file.compiled = true;
         file.content = content;
+        rext && (file.rext = rext);
         ast && (file.ast = ast);
 
         deps && deps.forEach(item => {

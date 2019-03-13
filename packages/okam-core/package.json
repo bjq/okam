@@ -1,8 +1,8 @@
 {
   "name": "okam-core",
-  "version": "0.4.4",
+  "version": "0.4.14",
   "description": "The extension for small program framework",
-  "main": "index.js",
+  "main": "src/index.js",
   "keywords": [
     "swan",
     "wx",
@@ -28,6 +28,7 @@
     "nyc": "^13.0.1",
     "promise-polyfill": "^8.0.0",
     "redux": "^4.0.1",
-    "regenerator-runtime": "^0.12.1"
+    "regenerator-runtime": "^0.12.1",
+    "vuex": "^3.1.0"
   }
 }

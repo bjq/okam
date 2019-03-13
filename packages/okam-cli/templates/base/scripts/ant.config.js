@@ -13,23 +13,6 @@ module.exports = merge({}, require('./base.config'), {
         depDir: 'src/common'
     },
     <% if: ${async} %>
-    localPolyfill: [
-        'async'
-    ],
+    localPolyfill: ['async']
     <% /if %>
-    processors: {
-        <% if: ${script} === 'babel' %>
-        babel: {
-            options: {
-                presets: ['babel-preset-env']
-            }
-        }
-        <% else %>
-        babel7: {
-            options: {
-                presets: ['@babel/preset-env']
-            }
-        }
-        <% /if %>
-    }
 });

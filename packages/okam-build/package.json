@@ -1,6 +1,6 @@
 {
   "name": "okam-build",
-  "version": "0.4.7",
+  "version": "0.4.23",
   "description": "The build tool for Okam develop framework",
   "main": "index.js",
   "keywords": [
@@ -18,7 +18,7 @@
     "wx:debug": "cd example/base && npm run dev:wx:debug",
     "test": "mocha --require intelli-espower-loader --require @babel/register \"test/tasks/**/*.spec.js\"",
     "test:coverage": "nyc npm run test",
-    "test:debug": "nyc mocha --inspect-brk --require intelli-espower-loader --require @babel/register \"test/tasks/**/*.spec.js\"",
+    "test:debug": "mocha --inspect-brk --require intelli-espower-loader --require @babel/register \"test/tasks/**/*.spec.js\"",
     "prepublish": "npm run lint && npm test"
   },
   "license": "MIT",
@@ -28,11 +28,12 @@
   },
   "dependencies": {
     "chokidar": "^2.0.4",
+    "glob": "^7.1.3",
     "hash-sum": "^1.0.2",
     "htmlparser2": "^3.9.2",
     "minimatch": "^3.0.4",
     "mkdirp": "^0.5.1",
-    "okam-helper": "^0.4.2",
+    "okam-helper": "^0.4.4",
     "resolve": "^1.8.1",
     "rimraf": "^2.6.2",
     "vue-template-compiler": "^2.5.16",

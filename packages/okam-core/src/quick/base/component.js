@@ -6,15 +6,7 @@
 'use strict';
 
 import base from '../../base/base';
-
-function selectElement(path) {
-    if (path && path.charAt(0) === '#') {
-        path = path.substr(1);
-    }
-
-    // only support id selector
-    return this.$element(path);
-}
+import {setDataByPath} from '../../helper/data';
 
 export default {
 
@@ -76,7 +68,7 @@ export default {
         // In quick app, required module may not be cached and the inner module
         // state cannot be persisted even if we have changed its inner state
         // during app lifetime.
-        // As for we need to register API anc change API dynamically when startup.
+        // As for we need to register API and change API dynamically when startup.
         // So, we get the global API must be from the global app instance.
         this.$api = rawApp.$api;
 
@@ -92,11 +84,6 @@ export default {
     attached() {
         // call beforeMount hook
         this.beforeMount && this.beforeMount();
-
-        this.$selector = {
-            select: selectElement.bind(this),
-            selectAll: selectElement.bind(this)
-        };
     },
 
     /**
@@ -118,7 +105,6 @@ export default {
         // call beforeDestroy hook
         this.beforeDestroy && this.beforeDestroy();
 
-        this.$selector = null;
         this.$isDestroyed = true; // add destroyed flag
 
         // call destroyed hook
@@ -165,9 +151,7 @@ export default {
          * @param {Function=} callback the callback when set data done
          */
         setData(pathInfo, callback) {
-            Object.keys(pathInfo).forEach(k => {
-                this.$set(k, pathInfo[k]);
-            });
+            setDataByPath(this, pathInfo);
 
             // simulate the callback execution when the set data done
             Promise.resolve().then(callback);

@@ -195,6 +195,10 @@ const PACKAGE_NAMES_MAP = {
                 version: '7.1.6'
             },
             {
+                name: '@babel/preset-typescript',
+                version: '7.1.0'
+            },
+            {
                 name: '@babel/preset-env',
                 version: '7.1.6'
             }
@@ -255,6 +259,12 @@ class BaseTemplate {
                 sfcExt
             }
         );
+
+        this.extnameMap = {
+            '.okm': sfcExt,
+            '.js': scriptExt,
+            '.styl': styleExt
+        };
     }
 
     async create() {
@@ -506,15 +516,9 @@ class BaseTemplate {
             fs.copy(fullPath, projectFilePath);
             return;
         }
-
-        if (extname === '.okm') {
-            projectFilePath = projectFilePath.replace(extname, '.' + this.params.sfcExt);
-        }
-        if (extname === '.js') {
-            projectFilePath = projectFilePath.replace(extname, '.' + this.params.scriptExt);
-        }
-        if (extname === '.styl') {
-            projectFilePath = projectFilePath.replace(extname, '.' + this.params.styleExt);
+        // 后缀替换
+        if (this.extnameMap[extname]) {
+            projectFilePath = projectFilePath.replace(extname, `.${this.extnameMap[extname]}`);
         }
 
         this.creater.etplEngine.renderTplToFile(

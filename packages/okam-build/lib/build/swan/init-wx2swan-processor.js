@@ -6,10 +6,10 @@
 'use strict';
 
 const {registerProcessor} = require('../../processor/type');
-const wxmlPlugin = require('../../processor/template/plugins/wx2swan-syntax-plugin');
+const wxmlPlugin = require('../../processor/template/plugins/syntax/wx2swan-syntax-plugin');
 const wxssPlugin = require('../../processor/css/plugins/postcss-plugin-wx2swan');
 const jsPlugin = require('../../processor/js/plugins/babel-wx2swan-plugin');
-const adapterPlugin = require('../../processor/js/plugins/babel-native-swan-plugin');
+const wxs2filter = require('../../processor/helper/wxs2filter');
 
 /**
  * Initialize wx component js processor
@@ -21,12 +21,12 @@ const adapterPlugin = require('../../processor/js/plugins/babel-native-swan-plug
  * @param {string} defaultBabelProcessorName default babel processor name
  */
 function initJsProcessor(opts, defaultBabelProcessorName) {
-    let plugins = (opts && opts.plugins) || [jsPlugin, adapterPlugin];
+    let plugins = (opts && opts.plugins) || [jsPlugin];
     registerProcessor({
         name: (opts && opts.processor) || defaultBabelProcessorName, // override existed processor
         hook: {
             before(file, options) {
-                if (file.isWxCompScript && !adapterPlugin.isAdapterModule(file.path)) {
+                if (file.isWxCompScript) {
                     options.plugins || (options.plugins = []);
                     options.plugins.push.apply(options.plugins, plugins);
                 }
@@ -45,7 +45,8 @@ function initJsProcessor(opts, defaultBabelProcessorName) {
 function initTplProcessor(opts) {
     registerProcessor({
         name: 'wxml2swan',
-        processor: 'view', // using the existed view processor
+        // using the existed view processor
+        processor: 'view',
         extnames: ['wxml'],
         rext: 'swan',
         options: opts || {
@@ -66,7 +67,8 @@ function initTplProcessor(opts) {
 function initStyleProcessor(opts) {
     registerProcessor({
         name: 'wxss2css',
-        processor: 'postcss', // using the existed postcss processor
+        // using the existed postcss processor
+        processor: 'postcss',
         extnames: ['wxss'],
         rext: 'css',
         options: opts || {
@@ -76,6 +78,32 @@ function initStyleProcessor(opts) {
         }
     });
 }
+
+
+/**
+ * Initialize wxs js processor
+ *
+ * @inner
+ * @param {Object=} opts the options to init
+ * @param {string=} opts.processor the builtin processor name, by default `babel`
+ * @param {Array=} opts.plugins the processor plugins
+ * @param {string} defaultBabelProcessorName default babel processor name
+ */
+function initWxsProcessor(opts, defaultBabelProcessorName) {
+    registerProcessor({
+        name: 'wxs2filter',
+        processor(file, options) {
+            let content = file.content.toString();
+
+            return {
+                content: wxs2filter(content)
+            };
+        },
+        extnames: ['wxs'],
+        rext: 'filter.js'
+    });
+}
+
 
 /**
  * Init wx2swan processors
@@ -87,7 +115,7 @@ function initStyleProcessor(opts) {
  * @param {string} defaultBabelProcessorName default babel processor name
  */
 function initProcessor(options = {}, defaultBabelProcessorName) {
-    let {js, css, tpl} = options;
+    let {js, css, tpl, wxs} = options;
 
     if (tpl !== false) {
         initTplProcessor(tpl);
@@ -99,6 +127,10 @@ function initProcessor(options = {}, defaultBabelProcessorName) {
 
     if (js !== false) {
         initJsProcessor(js, defaultBabelProcessorName);
+    }
+
+    if (wxs !== false) {
+        initWxsProcessor(js, defaultBabelProcessorName);
     }
 }
 

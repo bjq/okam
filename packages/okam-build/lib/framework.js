@@ -16,33 +16,52 @@ const FRAMEWORK_POLYFILL_BASE = FRAMEWORK_PATH_BASE + 'polyfill/';
  */
 const FRAMEWORK_EXTEND_PATH = {
     data: {
-        swan: 'extend/data/observable/swan/index',
-        ant: 'extend/data/observable/ant/index',
-        wx: 'extend/data/observable/wx/index',
-        tt: 'extend/data/observable/tt/index',
-        default: 'extend/data/observable/index'
+        'swan': 'extend/data/observable/swan/index',
+        'ant': 'extend/data/observable/ant/index',
+        'wx': 'extend/data/observable/wx/index',
+        'tt': 'extend/data/observable/tt/index',
+        'quick': 'extend/data/observable/quick/index',
+        'default': 'extend/data/observable/index'
     },
-    watch: 'extend/data/watch',
-    broadcast: 'extend/broadcast',
+    watch: {
+        'default': 'extend/data/watch/index',
+        'quick': 'extend/data/watch/quick/index'
+    },
+    broadcast: {
+        'default': 'extend/broadcast/index',
+        'quick': 'extend/broadcast/quick/index'
+    },
     behavior: {
-        ant: {
-            base: 'extend/behavior/index',
+        'ant': {
+            base: 'extend/behavior/ant/index',
             creator: 'extend/behavior/ant/Behavior'
         },
-        default: {
+        'quick': {
+            base: 'extend/behavior/quick/index',
+            creator: 'extend/behavior/quick/Behavior'
+        },
+        'default': {
             base: 'extend/behavior/index',
             creator: 'extend/behavior/Behavior'
         }
     },
     redux: 'extend/data/redux/index',
+    vuex: 'extend/data/vuex/index',
+    model: 'extend/data/model',
     ref: {
-        default: 'extend/ref/index',
-        ant: 'extend/ref/ant/index'
+        'default': 'extend/ref/index',
+        'ant': 'extend/ref/ant/index',
+        'quick': 'extend/ref/quick/index'
+    },
+    vhtml: {
+        'default': true
     },
     filter: {
         wx: true,
+        tt: true,
         swan: true,
-        ant: true
+        ant: true,
+        quick: 'extend/filter/quick/index'
     }
 };
 

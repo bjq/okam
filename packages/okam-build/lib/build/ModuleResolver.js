@@ -7,6 +7,7 @@
 
 const resolve = require('resolve');
 const pathUtil = require('path');
+const {file: fileUtil} = require('../util');
 
 function addResolveExtension(result, extensionName) {
     if (!extensionName.startsWith('.')) {
@@ -98,7 +99,35 @@ class ModuleResolver {
         this.extensions = this.initResolveExtensionNames(resolve, extensions);
         this.resolveFilter = createModuleIgnoreFilter(resolve && resolve.ignore);
         this.resolveAlias = createModuleAliasConverter(resolve && resolve.alias);
-        this.moduleDirs = resolve && resolve.modules;
+        this.initModuleResolvePathInfo(resolve && resolve.modules);
+    }
+
+    initModuleResolvePathInfo(moduleDirs) {
+        if (!moduleDirs) {
+            return;
+        }
+
+        if (!Array.isArray(moduleDirs)) {
+            moduleDirs = [moduleDirs];
+        }
+
+        let resolvePaths = [];
+        let resolveModuleDirs = [];
+        moduleDirs.forEach(item => {
+            if (typeof item !== 'string') {
+                return;
+            }
+
+            if (pathUtil.isAbsolute(item)) {
+                resolvePaths.push(item);
+            }
+            else {
+                resolveModuleDirs.push(item);
+            }
+        });
+
+        this.moduleDirs = resolveModuleDirs;
+        this.modulePaths = resolvePaths.length ? resolvePaths : null;
     }
 
     initResolveExtensionNames(resolve, extensions) {
@@ -117,9 +146,10 @@ class ModuleResolver {
      * @param {string} requireModId the module id to require
      * @param {string|Object} file the full file path or virtual file object
      *        to require the given module id
+     * @param {Object=} opts the extra resolve options
      * @return {?string}
      */
-    resolve(requireModId, file) {
+    resolve(requireModId, file, opts) {
         this.onResolve && this.onResolve(requireModId, file);
 
         if (this.resolveFilter && this.resolveFilter(requireModId, this.appType)) {
@@ -136,13 +166,15 @@ class ModuleResolver {
         let depFile;
         let filePath = typeof file === 'string' ? file : file.fullPath;
         try {
+            let resolveOpts = {
+                extensions: this.extensions,
+                basedir: pathUtil.dirname(filePath),
+                moduleDirectory: this.moduleDirs,
+                paths: this.modulePaths
+            };
+            opts && Object.assign(resolveOpts, opts);
             depFile = resolve.sync(
-                requireModId,
-                {
-                    extensions: this.extensions,
-                    basedir: pathUtil.dirname(filePath),
-                    moduleDirectory: this.moduleDirs
-                }
+                requireModId, resolveOpts
             );
 
             if (depFile === requireModId) {

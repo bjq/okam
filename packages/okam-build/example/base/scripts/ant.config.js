@@ -9,23 +9,25 @@ const merge = require('../../../').merge;
 
 module.exports = merge({}, require('./base.config'), {
     output: {
-        dir: 'ant_dist',
-        depDir: 'src/common'
+        dir: 'ant_dist'
     },
     localPolyfill: [
-        'async',
-        'promise'
+        'async'
+        // 'promise'
     ],
 
     framework: ['filter'],
-
     processors: {
         babel7: {
-            extnames: 'js',
-            options: {
-                presets: ['@babel/preset-env']
-            }
+            extnames: 'js'
+            // options: {
+            //     presets: ['@babel/preset-env']
+            // }
         }
+    },
+
+    api: {
+        htmlToNodes: 'mini-html-parser2'
     },
 
     dev: {

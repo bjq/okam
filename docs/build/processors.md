@@ -1,6 +1,6 @@
-# 预定义处理器
+# 内置处理器
 
-> 预定义的处理器，有相关的依赖，如果用到了相应的处理器需要安装下面指定的依赖，比如 stylus 处理器，需要安装 `stylus` 依赖: `npm i stylus --save-dev`。
+> 内置的处理器，有相关的依赖，如果用到了相应的处理器需要安装下面指定的依赖，比如 stylus 处理器，需要安装 `stylus` 依赖: `npm i stylus --save-dev`。
 
 ## 样式相关
 
@@ -21,18 +21,17 @@
     * 默认扩展名：`无`
     * 处理器选项：参考官方 [postcss](https://postcss.org/)
 
-
 ## 组件相关
 
 * `component`：用来编译单文件组件的处理器，属于核心的处理器，不需要安装任何附加依赖
     * 默认扩展名：依赖于构建配置的 `component.extname` 定义
 * `view`：用来编译单文件组件的模板部分，转成原生小程序支持的模板语法，属于核心的处理器，不需要安装任何附加依赖
     * 默认扩展名：`tpl`
-* `componentGenerator`: `0.4 版本开始支持` 生成 `SFC` 处理器，相当于 `component` 处理器逆过程，`快应用` 核心处理器。
+* ~~`componentGenerator`~~`quickComponentGenerator`(`0.4.9`变更): `0.4 版本开始支持` 生成 `SFC` 处理器，相当于 `component` 处理器逆过程，`快应用` 核心处理器。
 
 ## 模板相关
 
-* `pug`: [pug](https://github.com/pugjs/pug) 模板语法支持，为了使使用该语法的模板能继续使用 `okam` 框架扩展的模板语法，需要增加如下配置
+* `pug`: [pug](https://github.com/pugjs/pug) 模板语法支持，为了让使用该语法的模板能继续使用 `okam` 框架扩展的模板语法，需要增加如下配置
     * 默认扩展名：`pug`
     ```javascript
     {
@@ -145,6 +144,13 @@
         }
     }
     ```
+* `quickcss`: `0.4.11 版本开始支持` 引入该插件，会自动修复一些快应用不支持的写法，关于快应用样式支持可以参考[这里](https://doc.quickapp.cn/widgets/common-styles.html)
+    * 背景样式 `background` 定义会自动展开，由于快应用不支持合并的写法：[具体参考这里](https://doc.quickapp.cn/widgets/background-img-styles.html)，比如 `background: url(./img.png) no-repeat` 会转成 `background-image: url(./img.png); background-repeat: no-repeat;`
+    * 快应用颜色值不支持缩写：比如 `background-color: #2dd` 会转成 `background-color: #22dddd`，目前会对 `background` 及 `border` 相关样式的 `color` 进行处理；
+    * `border` 样式：快应用不支持 `none` 写法会自动转成 `0`，此外快应用不支持 `border-left/border-right/border-top/border-bottom` 合并写法，会被自动展开，比如 `border-left: 1px solid #ccc` 会转成 `border-left-width: 1px; border-left-style: solid; border-left-color: #cccccc;`
+    * `font-weight`: 快应用不支持 `数字` 写法，会自动转成 `normal` `bold` 取值，`<600` 会转成 `normal`，`>=600` 会转成 `bold`
+    * `display`: 快应用只支持 `flex`，`block` 值会自动转成 `flex`
+    * `position`: 快应用只支持 `fixed`，`absolute` 会自动转成 `fixed`
 
 * `autoprefixer`
     * 需要安装依赖：`npm i autoprefixer --save-dev`
@@ -168,6 +174,9 @@
                     px2rpx: {
                         // 设计稿尺寸
                         designWidth: 1242,
+                        // 开启 1px 不转, 即有 1px 的数字不会进行转换
+                        // 开启 1px 不转, okam-build 0.4.6 版本开始支持
+                        noTrans1px: true,
                         // 保留的小数点单位, 默认为 2
                         precision: 2
                     }

@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "init": "npm i && ln -s ../../../../okam-core node_modules",
+    "init": "npm i && ln -s ../../../../okam-core node_modules && ln -s ../../../../okam-component node_modules",
     "clean": "rm -rf dist/",
     "clean:wx": "rm -rf wx_dist/",
     "clean:ant": "rm -rf ant_dist/",
@@ -44,6 +44,7 @@
   "license": "ISC",
   "dependencies": {
     "lodash": "^4.17.10",
+    "mini-html-parser2": "^0.1.0",
     "moment": "^2.22.2",
     "redux": "^4.0.0",
     "redux-thunk": "^2.3.0"

@@ -5,72 +5,15 @@
 
 'use strict';
 
-const fs = require('fs');
 const path = require('path');
 const {file: fileUtil, string: strUtil} = require('../../util');
-const {getFileName, getFileState} = fileUtil;
+const {getFileName, relative: getRelative} = fileUtil;
 const {toHyphen} = strUtil;
 const USING_COMPONENT_KEY = 'usingComponents';
-
-/**
- * The native component file ext names
- *
- * @const
- * @type {Object}
- */
-const COMPONENT_FILE_EXT_NAMES = {
-    wxml: 'isWxCompScript',
-    swan: 'isSwanCompScript',
-    axml: 'isAntCompScript',
-    acss: false,
-    wxss: false,
-    css: false,
-    js: false
-};
-
-/**
- * Initialize the file list information in the given directory.
- * Return the file info structure:
- * {
- *    'fileName1': ['fullPath11', 'fullPath12'],
- *    'fileName2': ['fullPath21', 'fullPath22']'
- * }
- *
- * e.g., the dir `/test/src` has files: `/test/src/a.js`, `/test/src/a.css`
- * then response:
- * {
- *     'a': ['/test/src/a.js', '/test/src/a.css']
- * }
- *
- * @inner
- * @param {string} dir the directory to init
- * @param {CacheManager} cache the cache manager
- * @return {Object}
- */
-function initDirFiles(dir, cache) {
-    let cacheDirFiles = {};
-    cache.setDirFileListInfo(dir, cacheDirFiles);
-
-    let files = fs.readdirSync(dir);
-    for (let i = 0, len = files.length; i < len; i++) {
-        let file = files[i];
-        let fullPath = path.resolve(dir, file);
-
-        let stat = getFileState(fullPath);
-        if (!stat || stat.isDirectory()) {
-            continue;
-        }
-
-        let fileName = getFileName(fullPath);
-        let fileList = cacheDirFiles[fileName];
-        if (!fileList) {
-            fileList = cacheDirFiles[fileName] = [];
-        }
-        fileList.push(fullPath);
-    }
-
-    return cacheDirFiles;
-}
+const {
+    getCompFilesInfoByAppType,
+    isFileInSourceDir
+} = require('../helper/component');
 
 /**
  * Add component same name files
@@ -82,57 +25,67 @@ function initDirFiles(dir, cache) {
 function addComponentSameNameFiles(scriptFile, options) {
     const {dirname: currDir, path: relPath} = scriptFile;
     const scriptFileName = getFileName(relPath);
-    const {cache, addFile, getFileByFullPath} = options;
-    let cacheDirFiles = cache.getDirFileListInfo(currDir);
+    // fullPath
+    let filePathBase = path.join(currDir, scriptFileName);
 
-    let jsonFile;
-    let toAddFiles = [];
-    if (scriptFile.isNpm) {
-        if (!cacheDirFiles) {
-            cacheDirFiles = initDirFiles(currDir, cache);
+    const {
+        root,
+        addFile,
+        sourceDir,
+        getFileByFullPath,
+        appType,
+        wx2swan,
+        componentExtname,
+        logger
+    } = options;
+
+    let compFilesInfo = getCompFilesInfoByAppType(
+        filePathBase,
+        {
+            appType,
+            wx2swan,
+            componentExtname,
+            compileContext: options
         }
+    );
 
-        let sameNameFiles = cacheDirFiles[scriptFileName];
-        let sameNameFileNum = sameNameFiles ? sameNameFiles.length : 0;
-        for (let i = 0; i < sameNameFileNum; i++) {
-            let fileObj = addFile(sameNameFiles[i]);
-            let extname = fileObj.extname;
+    let {componentType, missingMustFileExtnames, fileExtnameMap} = compFilesInfo;
+    let jsonFile;
+    if (!isFileInSourceDir(scriptFile.path, sourceDir)) {
+        Object.keys(fileExtnameMap || {}).forEach(k => {
+            let fileObj = addFile(fileExtnameMap[k]);
 
-            let flagKey = COMPONENT_FILE_EXT_NAMES[extname];
-            if (typeof flagKey === 'string') {
-                // add flag for native component script
-                scriptFile[flagKey] = true;
-            }
-            else if (fileObj.isJson) {
+            if (fileObj.isJson) {
                 jsonFile = fileObj;
             }
-        }
+        });
     }
     else {
-        let filePathBase = `${currDir}/${scriptFileName}`;
         jsonFile = getFileByFullPath(`${filePathBase}.json`);
-
         if (jsonFile && !jsonFile.owner) {
-            Object.keys(COMPONENT_FILE_EXT_NAMES).forEach(k => {
-                let f = getFileByFullPath(`${filePathBase}.${k}`);
-                if (f) {
-                    toAddFiles.push(f.fullPath);
-                    let flagKey = COMPONENT_FILE_EXT_NAMES[k];
-                    // add flag for native component script
-                    typeof flagKey === 'string' && (scriptFile[flagKey] = true);
-                }
+            Object.keys(fileExtnameMap || {}).forEach(k => {
+                addFile(fileExtnameMap[k]);
             });
         }
+    }
+
+    // all must have js script except quick
+    if (componentType && scriptFile) {
+        scriptFile[componentType] = true;
     }
 
     if (jsonFile) {
         jsonFile.isComponentConfig = true;
         jsonFile.component = scriptFile;
-
-        toAddFiles.push(jsonFile.fullPath);
+        addFile(fileExtnameMap.json);
     }
 
-    toAddFiles.forEach(item => addFile(item));
+    if (missingMustFileExtnames.length) {
+        let compFile = getRelative(filePathBase, root);
+        missingMustFileExtnames.forEach(ext => {
+            logger.error(`missing component file: 「${compFile}.${ext}」.`);
+        });
+    }
 }
 
 /**
@@ -151,7 +104,6 @@ function analyseNativeComponent(scriptFile, options) {
 
     let {appType} = options;
     if (appType === 'quick') {
-        // TODO: analyse quick app native component
         return;
     }
 

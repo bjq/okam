@@ -143,7 +143,7 @@ function mergeVisitors(plugins) {
  * @return {Object}
  */
 function compileTpl(file, options) {
-    let {config, logger} = options;
+    let {config} = options;
     let allowCache = !config || config.cache == null || config.cache;
     let content = file.content.toString();
     const ast = file.ast || parseDom(content);
@@ -151,25 +151,19 @@ function compileTpl(file, options) {
 
     let plugins = mergeVisitors((config && config.plugins) || []);
 
-    let deps = [];
-    let addDep = function (filePath) {
-        if (!deps.includes(filePath)) {
-            deps.push(filePath);
-        }
-        logger.debug('find tpl dep file', filePath);
-    };
-
     transformAst(
         ast, plugins,
-        Object.assign({}, options, {file, addDep})
+        Object.assign({}, options, {file})
     );
 
-    // serialize by xml mode, close all elements
-    content = serializeDom(ast, {xmlMode: true});
+    let {keepOriginalContent} = config || {};
+    if (!keepOriginalContent) {
+        // serialize by xml mode, close all elements
+        content = serializeDom(ast, {xmlMode: true});
+    }
 
     return {
         ast,
-        deps,
         content
     };
 }

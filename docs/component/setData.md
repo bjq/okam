@@ -31,6 +31,8 @@ export default {
 };
 ```
 
+!> 为了实现数据操作响应式，对于用到的 `data` 根属性，必须预先声明好，动态添加的根数据属性或者动态添加的对象属性，是不支持响应式变更。如果想动态添加对象属性，可以参考下面对象操作说明。
+
 ## 基本操作
 
 原生小程序通过 `setData` `getData` API 来修改、获取数据，`setData` API 会引起视图层的自动更新；
@@ -45,11 +47,33 @@ okam 提供 `this.xxx` 方式直接访问数据，以及直接赋值来进行数
 `this.xxx = value` 等价于原生 `this.setData('xxx', value)` 或者 `this.setData({xxx: value})`, 数据属性需为 `data` 或 `props` 中定义的数据
 
 
-**注意：** 微信小程序对于数据操作 API 语法上跟百度小程序有些不同，比如没有 `getData` API，`setData` 只支持传入对象形式，如果考虑同时支持微信和百度小程序，可以使用扩展的数据操作语法，不使用原生语法保证兼容性，或者在使用原生语法上注意规避不兼容的语法。
+**注意：** 微信小程序对于数据操作 API 语法上跟百度小程序有些不同，比如没有 `getData` API，`setData` 只支持传入对象形式，如果考虑同时支持微信和百度小程序，可以使用扩展的数据操作语法，不使用原生语法保证兼容性，或者在使用原生语法上注意规避不兼容的语法。`快应用` 默认就提供了 `Vue` 数据操作方法，此外为了跟原生小程序对齐，也提供了一个类似的 `setData` API 操作，但其 `callback` 执行时机可能不准确，由于原生没有相应 API 能获知该变更完成的能力。
 
 ## 对象操作
 
 修改对象数据，可以直接按 JS 操作对象方式进行直接修改，e.g., `this.obj.name = 'xxx'`，等价于原生 `this.setData('obj.name', 'xxx')`。
+
+**注意：** 对于动态的对象属性，为了支持响应式，可以使用如下方式：
+
+```javascript
+export default {
+    data: {
+        obj: {
+            a: 1
+        }
+    },
+
+    methods: {
+        onClick() {
+            // 动态添加响应式属性
+            this.obj = Object.assign({}, this.obj, {
+                b: 2,
+                c: 'str'
+            });
+        }
+    }
+}
+```
 
 ## 数组操作
 
@@ -84,7 +108,7 @@ this.arr.splice(0, 1, 23);
 this.arr.splice(2);
 ```
 
-* 数组操作扩展的 `API` (如果考虑对齐 `Vue` 使用方式，需要避开该方式使用)
+* 数组操作扩展的 `API` (如果考虑对齐 `Vue` 使用方式，`快应用` 不支持，需要避开该方式使用)
 
     * `setItem(idx, value)`: 如果想替换某个数组项，除了上面的 `splice` 方式，还可以使用该扩展 API: `arr.setItem(idx, newValue)`
     * `getItem(idx)`: 如果想对数组项内容进行修改用于数组项为对象情况下，可以这么修改：`arr.getItem(idx).show = false`
@@ -93,6 +117,8 @@ this.arr.splice(2);
 ## 计算属性
 
 当某数据项的值由其他数据项计算得来时可通过 `computed` 定义实现；代码中可通过 `this.计算属性名` 来引用，模板中也可通过`{{ 计算属性名 }}` 来绑定数据
+
+!> `okam-core@0.4.7` 开始支持快应用 `computed`，依赖于原生的 `$watch` API，受限于 `快应用` 原生能力，如果依赖的数据属性是通过动态新增的根属性（使用 `$set` API 添加），是不支持的，由于快应用的 `$watch` 的 `handler` 必须预先声明好，不能动态添加。
 
 ```
 <template>
@@ -156,6 +182,8 @@ export default {
 }
 ```
 
+!> `okam-core@0.4.7` 开始支持快应用 `watch`，依赖于原生的 `$watch` API。
+
 一般情况下，使用 `computed` 基本能解决大部分业务场景问题，如果存在某些数据依赖需要异步去拉取数据更新，可以使用 `watch` 属性和 `$watch` API：
 
 * `watch` 属性
@@ -172,7 +200,7 @@ export default {
     * `callback`: watch 到变化执行的回调
     * `options`: watch 选项
 
-        * `options.deep`: `boolean` 默认 false，如果需要 watch 对象内部值变化，需要设为 `true`，**数组不需要**
+        * `options.deep`: `boolean` 默认 false，如果需要 watch 对象内部值变化，需要设为 `true`，**数组不需要** （`快应用` 不支持数组索引的 watch，不能 watch 到数组元素值变更，e.g., `arr[0].xx = xx` 不能变更，需要改成数组 API 的操作： `arr.splice(0, 1, Object.assign({}, arr[0], {xx: xx}))` 才能 watch 到变更）
         * `options.immediate`: `boolean` 默认 false，如果设为 true，会立即触发 `callback` 执行
 
 ```javascript
@@ -249,6 +277,7 @@ export default {
 
 组件数据变更后，将在下一个时钟周期更新视图；如果你修改了某些数据，想要在 DOM 更新后做某些事情，可以使用 $nextTick 方法
 
+!> 快应用不支持
 
 ``` javascript
 {

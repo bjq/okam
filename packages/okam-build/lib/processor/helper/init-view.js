@@ -30,6 +30,16 @@ function getFilterSyntaxPlugin(appType) {
 }
 
 /**
+ * Get model syntax transformation plugin
+ *
+ * @param {string} appType the app type to transform
+ * @return {string}
+ */
+function getModelSyntaxPlugin(appType) {
+    return path.join(PLUGIN_BASE_NAME, 'model', `${appType}-model-plugin`);
+}
+
+/**
  * Get template syntax transformation plugin
  *
  * @inner
@@ -37,8 +47,10 @@ function getFilterSyntaxPlugin(appType) {
  * @return {string}
  */
 function getTemplateSyntaxPlugin(appType) {
-    return path.join(PLUGIN_BASE_NAME, `${appType}-syntax-plugin`);
+    return path.join(PLUGIN_BASE_NAME, `syntax/${appType}-syntax-plugin`);
 }
+
+const REF_PLUGIN_PATH = path.join(PLUGIN_BASE_NAME, 'ref-plugin');
 
 /**
  * The builtin plugins
@@ -49,28 +61,42 @@ function getTemplateSyntaxPlugin(appType) {
 const BUILTIN_PLUGINS = {
     syntax: getTemplateSyntaxPlugin,
     eventSync: getEventSyntaxPlugin,
+    model: getModelSyntaxPlugin,
     tagTransform: path.join(PLUGIN_BASE_NAME, 'tag-transform-plugin'),
     vuePrefix: path.join(PLUGIN_BASE_NAME, 'vue-prefix-plugin'),
-    ref: path.join(PLUGIN_BASE_NAME, 'ref-plugin')
+    vhtml: path.join(PLUGIN_BASE_NAME, 'v-html-plugin'),
+    ref: {
+        'quick': [
+            REF_PLUGIN_PATH, {useId: true}
+        ],
+        'default': [REF_PLUGIN_PATH]
+    },
+    resource: path.join(PLUGIN_BASE_NAME, 'resource-plugin')
 };
 
 /**
  * Add ref plugin
  *
  * @inner
+ * @param {string} pluginName the builtin plugin name to add
+ * @param {string} appType the app type to transform
  * @param {Array.<Object>} plugins the existed plugins
- * @return {Array.<Object>}
+ * @param {boolean=} insertAtTop whether insert the added plugin at the first position
  */
-function addRefPlugin(plugins) {
-    let refPlugin = require(BUILTIN_PLUGINS.ref);
-    let hasRefPlugin = plugins.some(
-        item => (refPlugin === (Array.isArray(item) ? item[0] : item))
-    );
-    if (!hasRefPlugin) {
-        plugins.push(refPlugin);
+function addBuiltinPlugin(pluginName, appType, plugins, insertAtTop) {
+    let pluginInfo = BUILTIN_PLUGINS[pluginName];
+    if (typeof pluginInfo === 'object') {
+        pluginInfo = pluginInfo[appType] || pluginInfo.default;
     }
+    pluginInfo = normalizeViewPlugins([pluginInfo], appType)[0];
 
-    return plugins;
+    let plugin = Array.isArray(pluginInfo) ? pluginInfo[0] : pluginInfo;
+    let hasBuiltinPlugin = plugins.some(
+        item => (plugin === (Array.isArray(item) ? item[0] : item))
+    );
+    if (!hasBuiltinPlugin) {
+        plugins[insertAtTop ? 'unshift' : 'push'](pluginInfo);
+    }
 }
 
 /**
@@ -82,20 +108,26 @@ function addRefPlugin(plugins) {
  * @return {Array.<Object>}
  */
 function normalizeViewPlugins(plugins, appType) {
-    return plugins.map(item => {
-        let pluginItem = item;
+    return plugins.map(pluginInfo => {
+        let pluginItem = pluginInfo;
         let pluginOptions;
-        if (Array.isArray(item)) {
-            pluginItem = item[0];
-            pluginOptions = item[1];
+        if (Array.isArray(pluginInfo)) {
+            pluginItem = pluginInfo[0];
+            pluginOptions = pluginInfo[1];
         }
-        else if (typeof item === 'string') {
-            let pluginPath = BUILTIN_PLUGINS[item];
+
+        if (typeof pluginItem === 'string') {
+            let pluginPath = BUILTIN_PLUGINS[pluginItem];
             if (typeof pluginPath === 'function') {
                 pluginPath = pluginPath(appType);
             }
             else if (pluginPath && typeof pluginPath === 'object') {
-                pluginPath = pluginPath[appType];
+                pluginPath = pluginPath[appType] || pluginPath.default;
+            }
+
+            if (pluginPath && Array.isArray(pluginPath)) {
+                pluginOptions = pluginPath[1];
+                pluginPath = pluginPath[0];
             }
 
             pluginPath && (pluginItem = pluginPath);
@@ -157,13 +189,18 @@ function handleOnFilter(file, filterName) {
  *           tag() {} // refer to the ref plugin implementation
  *        }
  * @param {BuildManager} buildManager the build manager
+ * @param {boolean=} isNativeView whether is native view transformation
  * @return {Object}
  */
-function initViewTransformOptions(file, processOpts, buildManager) {
-    let isSupportRef = buildManager.isEnableRefSupport();
+function initViewTransformOptions(file, processOpts, buildManager, isNativeView) {
     let plugins = processOpts.plugins;
+    let {appType, componentConf, buildConf} = buildManager;
+    if (isNativeView) {
+        return Object.assign({}, processOpts, {
+            plugins: normalizeViewPlugins(plugins, appType)
+        });
+    }
 
-    let {appType, componentConf} = buildManager;
     let templateConf = (componentConf && componentConf.template) || {};
     if (!plugins || !plugins.length) {
         plugins = ['syntax'];
@@ -179,9 +216,13 @@ function initViewTransformOptions(file, processOpts, buildManager) {
     }
 
     plugins = normalizeViewPlugins(plugins, appType);
-    if (isSupportRef) {
-        plugins = addRefPlugin(plugins);
-    }
+    let isSupportRef = buildManager.isEnableRefSupport();
+    isSupportRef && addBuiltinPlugin('ref', appType, plugins);
+
+    let isSupportVHtml = buildManager.isEnableVHtmlSupport();
+    isSupportVHtml && addBuiltinPlugin('vhtml', appType, plugins);
+
+    addBuiltinPlugin('resource', appType, plugins, true);
 
     processOpts.plugins = plugins;
 
@@ -196,6 +237,7 @@ function initViewTransformOptions(file, processOpts, buildManager) {
         {},
         processOpts,
         {
+            framework: buildConf.framework || [],
             plugins,
             filter: filterOptions,
             template: templateConf,
@@ -208,3 +250,4 @@ module.exports = exports = initViewTransformOptions;
 
 exports.getEventSyntaxPlugin = getEventSyntaxPlugin;
 exports.getFilterSyntaxPlugin = getFilterSyntaxPlugin;
+exports.getModelSyntaxPlugin = getModelSyntaxPlugin;

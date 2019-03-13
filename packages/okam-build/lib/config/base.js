@@ -35,6 +35,7 @@ module.exports = {
      * ref 扩展：允许模板指定 ref 属性，组件实例 $refs 获取引用类似 Vue
      * watch: 支持 watch 配置 和 $watch API，依赖 data 扩展需要一起配置
      * redux: 支持 redux 状态管理库，依赖 data 扩展需要一起配置
+     * vuex: 支持 vuex 状态管理库，依赖 data 扩展需要一起配置
      * behavior: 支持组件包括 page 的 mixin 支持
      * filter: 支持 Vue filter 语法，filter 定义通过组件 filters 属性定义
      * 可选。e.g., ['data', 'broadcast', 'ref']
@@ -82,6 +83,8 @@ module.exports = {
      * 模块路径 resolve 选项，可选
      * {
      *     extensions: ['xx'], // 查找的模块文件后缀名，会跟默认查找的后缀名做合并
+     *     alias: {'common/': 'src/common/'}, // 模块别名设置，同 webpack#resolve.alias
+     *     modules: ['node_modules', 'dep'], // 模块查找目录，如果传入绝对路径不会递归查找
      *     // 要忽略 resolve 的模块 id，可以传入正则，或者字符串数组，也可以是一个 function
      *     // 返回 true 表示要忽略，返回 false 表示不忽略。
      *     ignore: /^@system/ | ['@system/xx', /^@xxx/] | (moduleId, appType) => return true;
@@ -90,7 +93,11 @@ module.exports = {
      *
      * @type {Object}
      */
-    resolve: null,
+    resolve: {
+        alias: {
+            'okam$': 'okam-core/src/index'
+        }
+    },
 
     /**
      * 执行的脚本命令，目前提供了两个钩子来执行命令： `onBuildStart` `onBuildDone`
@@ -139,7 +146,8 @@ module.exports = {
         exclude: [],
 
         /**
-         * 要 include 的文件
+         * 要 include 的文件，支持 glob pattern，相对于 root，如果是正则，只支持
+         * root 下文件 或者 source 下文件 的 match
          *
          * @type {Array.<string|RegExp>}
          */
@@ -191,6 +199,12 @@ module.exports = {
 
         /**
          * 输出的 NPM 依赖文件存放的目录
+         * 也支持设置成对象形式：
+         * {
+         *    node_modules: 'src/dep', // 依赖文件路径前缀为 node_modules/ 挪到 src/dep 下
+         *    bower_components: 'src/dep' // 依赖文件路径前缀为 bower_components/ 挪到 src/dep 下
+         * }
+         * 如果设置为字符串，默认为将依赖文件路径前缀为 node_modules/ 挪到 src/dep 下
          *
          * @type {string}
          */
@@ -265,12 +279,45 @@ module.exports = {
          * @type {Object}
          */
         template: {
+
             /**
              * vue v- 前缀支持
              *
              * @type {Boolean}
              */
             useVuePrefix: false,
+
+            /**
+             * 组件 v-model 配置项
+             *
+             * @type {Object}
+             *
+             * 不同平台已内置相应的表单元素
+             * 以及默认自定义组件值，无特殊场景可以不配置
+             *
+             * 设置 default 可以替换 所有自定义组件默认属性
+             * {
+             *     // 设置所有自定义组件
+             *    'default': {
+             *        // 必填 事件类型
+             *        event: 'change',
+             *        // 必填 对应 props 的属性名
+             *        prop: 'value',
+             *        // 对于event.detail 中的字段值的key
+             *        // 不传表示为 event.detail 本身
+             *        detailProp: 'value'
+             *     },
+             *
+             *    // 配置特定组件的 v-model 对应值
+             *    'sp_component': {
+             *        event: 'spchange',
+             *        prop: 'valuex'
+             *     }
+             *   eg:
+             *       <sp_component v-model="xxx" />
+             * }
+             */
+            modelMap: null,
 
             /**
              * 标签转换支持
@@ -297,7 +344,21 @@ module.exports = {
              * 转为:
              * <navigator class="inline" url='xxx'></navigator>
              */
-            transformTags: null
+            transformTags: null,
+
+            /**
+             * 定义模板依赖的本地资源信息获取的标签属性信息，
+             * 如果不想获取某个标签依赖资源信息，可以配置为 false
+             *
+             * {
+             *    img: 'src',
+             *    import: true, // 设为 true，默认为 src 属性获取依赖的资源
+             *    include: false // 设为 false，不会分析该标签的依赖资源
+             * }
+             *
+             * @type {?Object}
+             */
+            resourceTags: null
         }
     },
 

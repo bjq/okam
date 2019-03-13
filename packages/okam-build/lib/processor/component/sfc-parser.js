@@ -6,35 +6,33 @@
 'use strict';
 
 const compiler = require('vue-template-compiler');
+const {replaceExtname} = require('../../util').file;
 const helper = require('./helper');
 
-function initPartFileInfo(file, ...parts) {
-    let addPart = part => {
-        if (part) {
-            file.addSubFile(part);
-        }
-    };
+function createPartFile(ownerFile, partInfo, opts) {
+    let file = helper.getComponentPartFile(partInfo, opts);
+    if (!file) {
+        return;
+    }
 
-    parts.forEach(item => {
-        if (Array.isArray(item)) {
-            for (let k = 0, len = item.length; k < len; k++) {
-                addPart(item[k]);
-            }
-        }
-        else {
-            addPart(item);
-        }
-    });
+    let {resolvePath} = ownerFile;
+    if (resolvePath) {
+        file.resolvePath = replaceExtname(resolvePath, file.extname);
+    }
+
+    ownerFile.addSubFile(file);
+
+    return file;
 }
 
 /**
  * Parse the single file component.
  * Return the component file info:
  * {
- *     template: Object,
+ *     tpl: Object,
  *     script: Object,
  *     styles: Array.<Object>,
- *     customBolcks: Array.<string>
+ *     customBlocks: Array
  * }
  *
  * @param {Object} file the file to process
@@ -43,48 +41,52 @@ function initPartFileInfo(file, ...parts) {
  * @return {Object}
  */
 function parse(file, options) {
-    let config = options.config;
+    let {root, config} = options;
     let parseOpts = Object.assign({}, {pad: 'line'}, config && config.parse);
     let result = compiler.parseComponent(
         file.content.toString(), parseOpts
     );
 
-    let tplFile = helper.getComponentPartFile(result.template, {
+    let {customBlocks} = result;
+
+    let {fullPath: filePath} = file;
+    let tplFile = createPartFile(file, result.template, {
         isTemplate: true,
-        root: options.root,
-        filePath: file.fullPath
+        root,
+        filePath
     });
 
-    let scriptFile = helper.getComponentPartFile(result.script, {
+    let scriptFile = createPartFile(file, result.script, {
         isScript: true,
-        root: options.root,
-        filePath: file.fullPath
+        root,
+        filePath
     });
 
     let styleFiles = result.styles.map(
-        (item, index) => helper.getComponentPartFile(item, {
+        (item, index) => createPartFile(file, item, {
             isStyle: true,
             index,
-            root: options.root,
-            filePath: file.fullPath
+            root,
+            filePath
         })
     );
 
-    initPartFileInfo(file, tplFile, scriptFile, styleFiles);
-
     // fix pad line missing when lang is set in script part
     if (scriptFile && parseOpts.pad === 'line') {
-        scriptFile.content = scriptFile.content.replace(
+        let content = scriptFile.content.toString();
+        scriptFile.content = content.replace(
             /^\n+/, match => match.replace(/\n/g, '//\n')
         );
     }
 
     if (config && config.trim) {
-        scriptFile.content = scriptFile.content.trim();
+        let content = scriptFile.content.toString();
+        scriptFile.content = content.trim();
     }
 
     return {
-        isComponent: true,
+        isSfcComponent: true,
+        customBlocks,
         tpl: tplFile,
         script: scriptFile,
         styles: styleFiles

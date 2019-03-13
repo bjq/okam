@@ -7,7 +7,7 @@
 
 const path = require('path');
 const postcss = require('postcss');
-const normalizePlugins = require('../helper/plugin');
+const {normalizePlugins} = require('./plugins/helper');
 
 const BUILTIN_PLUGINS = {
     autoprefixer: {
@@ -27,17 +27,28 @@ const BUILTIN_PLUGINS = {
             precision: 2
         }
     },
-    cssImport: {
-        path: path.join(__dirname, 'plugins', 'postcss-plugin-import.js')
-    },
     env: {
         path: path.join(__dirname, 'plugins', 'postcss-plugin-env.js')
+    },
+    resource: {
+        path: path.join(__dirname, 'plugins', 'postcss-plugin-resource.js')
+    },
+    quickcss: {
+        path: path.join(__dirname, 'plugins', 'postcss-plugin-quickcss.js')
     }
 };
 
 module.exports = function (file, options) {
-
-    let {root, appType, allAppTypes, designWidth, config, output} = options;
+    let {
+        root,
+        appType,
+        allAppTypes,
+        designWidth,
+        config,
+        output,
+        resolve,
+        logger
+    } = options;
     let styleExtname = output.componentPartExtname
         && output.componentPartExtname.style;
 
@@ -46,17 +57,43 @@ module.exports = function (file, options) {
         BUILTIN_PLUGINS.px2rpx.options.designWidth = designWidth;
     }
 
-    let plugins = normalizePlugins(config.plugins, BUILTIN_PLUGINS, root);
+    let plugins = config.plugins || [];
+    if (!Array.isArray(plugins)) {
+        plugins = Object.keys(plugins).map(
+            k => ({name: k, options: plugins[k]})
+        );
+    }
+    plugins.unshift('resource');
+    plugins = normalizePlugins(plugins, BUILTIN_PLUGINS, root);
 
-    plugins = (plugins || []).map(({handler, options}) => handler(
-        Object.assign({
-            allAppTypes,
-            appType,
-            styleExtname
-        },
-        options)
-    ));
-    let {css, result} = postcss(plugins)
+    if (!plugins || !plugins.length) {
+        // skip process if none plugins provided
+        return {
+            content: file.content
+        };
+    }
+
+    plugins = (plugins || []).map(
+        ({name, handler, options, noInit}) => {
+            if (noInit) {
+                return handler;
+            }
+
+            let pluginOpts = Object.assign({
+                allAppTypes,
+                appType,
+                styleExtname,
+                filePath: file.path,
+                logger
+            }, options);
+
+            if (name === 'resource') {
+                Object.assign(pluginOpts, {file, resolve});
+            }
+            return handler(pluginOpts);
+        }
+    );
+    let {css} = postcss(plugins)
         .process(
             file.content.toString(),
             {
@@ -66,7 +103,7 @@ module.exports = function (file, options) {
 
     return {
         content: css,
-        deps: result.deps
+        rext: styleExtname
     };
 };
 

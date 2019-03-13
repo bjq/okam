@@ -14,12 +14,19 @@ class BuildAntAppManager extends BuildManager {
     /**
      * @override
      */
+    getModulePathKeepExtnames() {
+        return ['.sjs'];
+    }
+
+    /**
+     * @override
+     */
     initProcessor(buildConf) {
         super.initProcessor(buildConf);
 
         updateReferProcessorInfo('filter', this.defaultBabelProcessorName);
 
-        // register native swan processor
+        // register native ant processor
         let nativeOpts = buildConf.native;
         if (nativeOpts !== false) {
             initNativeAntProcessor(nativeOpts, this.defaultBabelProcessorName);

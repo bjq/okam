@@ -1,0 +1,55 @@
+/**
+ * @file 字体图标定义
+ */
+
+// font-face('okam', '../font/bdfont')
+
+@font-face
+    font-family: okam
+    src: url(../font/bdfont.eot)
+    src: url(../font/bdfont.eot?) format('embedded-opentype'),
+         url(../font/bdfont.woff) format('woff'),
+         url(../font/bdfont.ttf) format('truetype'),
+         url(../font/bdfont.svg) format('svg')
+    font-weight: 400
+    font-style:normal
+
+.icon
+    font-family: 'okam'
+    speak: none
+    font-style: normal
+    font-weight: normal
+    font-variant: normal
+    text-transform: none
+    line-height: 1
+    -webkit-font-smoothing: antialiased
+
+.i-locked
+    @extend .icon
+    &:before
+        content: '\e001'
+
+.i-fullscreen
+    @extend .icon
+    &:before
+        content: '\e002'
+
+
+.i-edit
+    @extend .icon
+    &:before
+        content: '\e003'
+
+.i-refresh
+    @extend .icon
+    &:before
+        content: '\e004'
+
+.i-check
+    @extend .icon
+    &:before
+        content: '\e005'
+
+
+
+

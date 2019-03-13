@@ -8,14 +8,20 @@
 /* eslint-disable fecs-min-vars-per-destructure */
 /* eslint-disable fecs-prefer-destructure */
 
-const path = require('path');
 const {createFile} = require('./FileFactory');
 const {findMatchProcessor, getBuiltinProcessor} = require('./helper/processor');
-const {getEventSyntaxPlugin, getFilterSyntaxPlugin} = require('./helper/init-view');
+const {getEventSyntaxPlugin, getFilterSyntaxPlugin, getModelSyntaxPlugin} = require('./helper/init-view');
 const registerProcessor = require('./type').registerProcessor;
 const {isPromise} = require('../util').helper;
 const {toHyphen} = require('../util').string;
-const {relative, replaceFileName, getFileName, getRequirePath} = require('../util').file;
+const {
+    relative,
+    replaceFileName,
+    getFileName,
+    getRequirePath
+} = require('../util').file;
+
+const {addProcessEntryPages} = require('./helper/component');
 
 function processConfigInfo(file, root, owner) {
     let config = file.config;
@@ -40,6 +46,10 @@ function processFilterInfo(file, owner, buildManager) {
     }
 
     let {code} = filters;
+    if (!code) {
+        return;
+    }
+
     let {root, buildConf} = buildManager;
     let outputConf = buildConf.output;
     let componentPartExtname = outputConf
@@ -62,7 +72,7 @@ function processFilterInfo(file, owner, buildManager) {
 }
 
 function processEntryScript(file, buildManager) {
-    let {root, files: allFiles, componentExtname, logger} = buildManager;
+    let {root, files: allFiles, logger} = buildManager;
     let appConfig = file.config || {};
     file.config = appConfig;
 
@@ -81,21 +91,22 @@ function processEntryScript(file, buildManager) {
                 return [];
             })
             .reduce((a, b) => a.concat(b));
-
         pages = pages.concat(subPackagesPages);
     }
 
-    pages.forEach(
-        p => {
-            let pageFullPath = path.resolve(file.dirname, p)
-                + '.' + componentExtname;
-            let pageFile = allFiles.getByFullPath(pageFullPath);
-            if (pageFile) {
-                pageFile.isPageComponent = true;
-                buildManager.addNeedBuildFile(pageFile);
-            }
-        }
+    let allPageFiles = [];
+    let pageFileMap = {};
+
+    addProcessEntryPages(
+        pages, pageFileMap, allPageFiles,
+        file.dirname, buildManager
     );
+
+    // resolve page path as new path if needed, currently only for quick app
+    if (buildManager.resolvePageNewPath) {
+        buildManager.resolvePageNewPath(allPageFiles);
+        buildManager.normalizeAppPageConfig(pageFileMap, appConfig, file.dirname);
+    }
 
     let jsonFile = processConfigInfo(file, root, file);
     if (!jsonFile) {
@@ -103,6 +114,7 @@ function processEntryScript(file, buildManager) {
         return;
     }
     jsonFile.isAppConfig = true;
+
     allFiles.push(jsonFile);
 
     buildManager.addNeedBuildFile(jsonFile);
@@ -147,7 +159,7 @@ function processFile(file, processor, buildManager) {
         return;
     }
 
-    if (result.isComponent) {
+    if (result.isSfcComponent) {
         compileComponent(result, file, buildManager);
         result = {content: file.content};
     }
@@ -228,25 +240,46 @@ function getImportFilterModules(usedFilters, scriptFile, buildManager) {
 
     let filterModules = [];
     let {file: filterFile, filterNames: definedFilters} = scriptFile.filters || {};
-    let usedFilterFile;
-    definedFilters && usedFilters.forEach(item => {
+    let hasFilterUsed = definedFilters && usedFilters.some(item => {
         if (definedFilters.includes(item)) {
-            usedFilterFile = filterFile;
+            return true;
         }
+        return false;
     });
 
-    if (usedFilterFile) {
-        let src = relative(usedFilterFile.path, scriptFile.dirname);
+    if (!hasFilterUsed) {
+        return filterModules;
+    }
+
+    if (filterFile) {
+        let src = relative(filterFile.path, scriptFile.dirname);
         if (src.charAt(0) !== '.') {
             src = './' + src;
         }
         filterModules.push({src, filters: definedFilters});
     }
+    else {
+        filterModules.push({filters: definedFilters});
+    }
 
     return filterModules;
 }
 
+function compileNativeComponent(component, buildManager) {
+    let scriptFile = component.script;
+    if (scriptFile) {
+        compile(scriptFile, buildManager);
+    }
+
+    let styleFiles = component.styles || [];
+    styleFiles.forEach(item => compile(item, buildManager));
+}
+
 function compileComponent(component, file, buildManager) {
+    if (file.isNativeComponent) {
+        return compileNativeComponent(component, buildManager);
+    }
+
     let tplFile = component.tpl;
     if (tplFile) {
         // tpl compile should ahead of the script part to extract ref info
@@ -295,6 +328,20 @@ function compileComponent(component, file, buildManager) {
             filterModules && tplPlugins.push([
                 getFilterSyntaxPlugin(buildManager.appType),
                 {filters: filterModules}
+            ]);
+        }
+
+        // 在事件处理之后处理
+        let enableModel = buildManager.isEnableModelSupport();
+        if (enableModel) {
+            let {componentConf} = buildManager;
+            let templateConf = (componentConf && componentConf.template) || {};
+            tplPlugins.push([
+                getModelSyntaxPlugin(buildManager.appType),
+                {
+                    customComponentTags,
+                    modelMap: templateConf.modelMap
+                }
             ]);
         }
 

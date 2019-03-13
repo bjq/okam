@@ -19,6 +19,8 @@ npm install
 
 ```
 
+!> 如果想支持 `快应用`，且需要 `多平台支持`，建议**优先开发快应用，再兼容其它平台**，由于快应用组件、API 和 样式差异性跟小程序比较大，此外各个平台组件对齐还有 API 目前需要开发者[自行实现](advance/platformSpecCode)。快应用开发模式跟小程序一样，具体差异点可以看各个章节文档说明。`快应用` 并没有像其它小程序平台提供了全局的 `API` 供访问，目前 `Okam` 框架参照 `微信小程序` 封装对齐了微信部分 API，建议开发者通过[扩展全局API方式](advance/platformSpecCode#API)来新增 API，不建议自行 `import clipboard from '@system.clipboard'` 方式来访问，除非你不考虑多平台支持，此外导入接口包一般情况下也不需要配置 `features`，具体可以参考[配置说明](app/entry#快应用配置)。`快应用` 样式跟其它小程序平台差异比较大，对此 `okam` 也做了一些兼容修复，需要在构建配置引入 `postcss` 插件 `quickcss`，具体配置可以参考[这里](build/processors#Postcss插件)。
+
 ## 运行调试
 
 * 百度小程序运行命令
@@ -95,9 +97,21 @@ npm install
 
 ## 更新工具或项目包
 
-更新 cli: `okam upgrade self`
+升级 `cli (okam-cli)`
 
-将 项目中 okam 依赖 更新为最新版本依赖:  `cd <项目Root> && okam upgrade project`，替换成自己的 Okam 项目路径
+```
+okam upgrade self
+
+```
+
+升级 项目中 `okam 依赖(okam-build、okam-core、okam-xxx)`
+
+```
+// 替换成自己的 Okam 项目路径
+cd <项目Root>
+
+okam upgrade project
+```
 
 ## 目录结构
 
@@ -115,6 +129,7 @@ npm install
 ├── tt_dist               // 头条小程序 构建产物，开发工具得选择该构建产物目录作为项目根目录方能预览
 ├── quick_dist            // 快应用 构建产物，具体调试预览跟小程序不同，详见后面说明
 ├── .tinyimgcache         // 自动生成，图片压缩的缓存信息，不可删掉，否则会导致图片重复压缩
+├── .frameworkinfo        // 百度小程序使用，不能删掉，也不能手动修改
 ├── project.json5         // 小程序项目配置文件，除了语法使用 JS 对象形式，配置说明参考官方小程序说明
 ├── scripts               // 构建相关脚本
 │   ├── build.js          // 构建入口脚本
@@ -142,9 +157,9 @@ npm install
 
 ## 示例项目
 
-* 基础项目：[okam-template](https://github.com/ecomfe/okam-template)。
-* 使用 `redux` 的 todo 项目：[okam-todo](https://github.com/The-only/okam-todo)。
-
+* 基础项目：[okam-template](https://github.com/ecomfe/okam-template)
+* 使用 `redux` 的 todo 项目：[okam-todo](https://github.com/The-only/okam-todo)
+* 更多示例，可以参考 [awesome-okam](https://github.com/awesome-okam)
 
 ## 开发规范
 

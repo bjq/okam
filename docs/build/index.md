@@ -2,6 +2,24 @@
 
 ## 构建配置项
 
+构建配置项，在 `script/*.config.js` 文件中进行配置
+
+以 `okam-cli` 构建的项目目录为例
+
+```
+.
+└─ scripts                // 构建相关脚本
+    ├── build.js          // 构建入口脚本
+    ├── build.sh          // CI 脚本
+    ├── base.config.js    // 基础公共构建配置文件
+    ├── tt.config.js      // 头条小程序构建配置文件
+    ├── init-quick-app.js // 快应用项目初始化脚本
+    ├── quick.config.js   // 快应用构建配置文件
+    ├── ant.config.js     // 支付宝小程序构建配置文件
+    ├── wx.config.js      // 微信小程序构建配置文件
+    └── swan.config.js    // 百度 Swan 小程序构建配置文件
+```
+
 ### verbose
 `boolean` 是否打印详细的构建信息，默认 false，该选项设为 true，等价于 logLevel 设为 `info`
 
@@ -18,14 +36,18 @@
 `Array.<string>` 扩展的原生小程序的框架，目前只支持 `okam-core` 提供的扩展
 
 * `data`: 支持 `vue` 数据操作方式 及 `computed`
-* `broadcast`: 支持广播事件
+* `model`: 提供 `v-model` 支持 (要求：`okam-build: 0.4.11`, `okam-core: 0.4.8`)
+* `vhtml`: 提供 `v-html` 支持 (要求：`okam-build: 0.4.22`)
 * `watch`: 提供 `watch` 属性 和 `$watch` API 支持，依赖 `data`
+* `broadcast`: 支持广播事件
 * `ref`: 允许模板指定 `ref` 属性，组件实例 `$refs` 获取引用，类似 Vue
 * `redux`: 使用 `redux` 进行状态管理，要求安装依赖 `redux` 库：`npm i redux --save`, 另外，`redux` 依赖 `data` 扩展，因此需要一起配置
 * `behavior`: mixin 支持包括页面组件和自定义组件，对于插件支持选项，可以传入数组形式：`[ ['behavior', '{useNativeBehavior: true}'] ]`，**注意** 第二个参数为插件选项代码的字符串形式
+* `filter`: 提供 `filter` 支持，使用示例参考[这里](component/filter)
+
 ```javascript
 {
-    framework: ['data', 'watch', 'broadcast', 'ref', 'redux', 'behavior']
+    framework: ['data', 'watch', 'model', 'vhtml', 'broadcast', 'ref', 'redux', 'behavior', 'filter']
 }
 ```
 
@@ -94,10 +116,12 @@ import Promise from 'okam-core/src/polyfill/promise';
 
 * `resolve.extensions`: `Array.<string>` 查找的模块文件后缀名，会跟默认查找的后缀名做合并
 * `resolve.ignore`: `RegExp|Array.<string|RegExp>|(moduleId, appType):Boolean` 要忽略 resolve 的模块 id，可以传入正则，或者数组，也可以是一个 function
-* `onResolve(depModId, file)`: `Function` resolve dep 时候事件监听回调
+* `resolve.onResolve(depModId, file)`: `Function` resolve dep 时候事件监听回调
+* `resolve.alias`: 设置引用的模块的别名设置，具体设置同 [webpack.alias](https://webpack.js.org/configuration/resolve/#resolve-alias)，默认 `{'okam$': 'okam-core/src/index'}` `0.4.8 版本开始支持`
+* `resolve.modules`: 设置递归查找模块的目录，默认 `node_modules` `0.4.8 版本开始支持`
 
 ```javascript
-// 快应用的 resolve 配置定义
+// resolve 配置示例
 const notNeedDeclarationAPIFeatures = [
     '@system.router',
     '@system.app'
@@ -107,6 +131,19 @@ module.exports = {
     // ...
     resolve: {
         ignore: /^@(system|service)\./, // 忽略快应用的内部系统模块的 resolve
+
+        // 模块别名配置
+        // import {api} from 'okam';
+        // 等价于 import {api} from 'okam-core/src/index';
+        // import util form 'common/util';
+        // 等价于 import util from 'src/common/util';
+        alias: {
+            'okam$': 'okam-core/src/index', // 默认构建配置别名设置
+            'common/': 'src/common/',
+        },
+
+        // 模块查找目录，如果提供的是绝对路径，则不会递归查找，未设置，默认 node_modules
+        modules: ['node_modules', path.join(__dirname, '../src/common')],
 
         /**
          * 收集需要导入声明的 API features
@@ -170,6 +207,16 @@ module.exports = {
 * `source.exclude`: `Array.<string|RegExp>` 要 exclude 的文件
 * `source.include`: `Array.<string|RegExp>` 要 include 的文件
 
+!> `okam-build@0.4.9` 开始，`source.include` 支持传入 [glob](https://github.com/isaacs/node-glob) pattern，来额外引入没有被分析到依赖的资源文件，比如字体资源文件，当前没有处理，该文件不局限在 `src` 目录下文件，也可以是 `node_modules` 下文件。**注意**：如果传入的是正则只能匹配根目录下文件（不包括子目录下）或者 `src` 目录下的文件。
+
+```javascript
+{
+    source: {
+        include: [/^src\/common\/font\/.*/, 'node_modules/xx/**/*.png']
+    }
+}
+```
+
 ### entry
 `Object` 小程序入口配置
 
@@ -181,8 +228,53 @@ module.exports = {
 `Object` 项目构建输出配置信息
 
 * `output.dir`: `string` 输出的目标目录
-* `output.depDir`: `string` 输出的 NPM 依赖文件存放的目录，相对于项目根目录
+* `output.depDir`:
+    * `string` 输出的 NPM 依赖文件存放的目录，相对于项目根目录，默认 `node_modules` 目录下文件
+    * `Object` 配置多个依赖目录存放的目录 `0.4.8 版本开始支持`
 * `output.file`: `function(string, Object): boolean|string` 自定义输出文件路径，如果该文件不输出，返回 `false`
+
+```javascript
+
+{
+    output: {
+        dir: 'dist',
+        depDir: {
+            node_modules: 'src/dep', // 将依赖文件路径前缀为 `node_modules/` 移到 `src/dep` 下
+            bower_components: 'src/dep' // 将依赖文件路径前缀为 `bower_components/` 移到 `src/dep` 下
+        },
+
+        /**
+         * 自定义输出文件路径。
+         * 如果该文件不输出，返回 `false`。
+         *
+         * @param {string} path 要输出的文件相对路径
+         * @param {Object} file 要输出的文件对象
+         * @return {boolean|string}
+         */
+        file(path, file) {
+            if (file.isStyle && file.extname !== 'css' && !file.compiled) {
+                return false;
+            }
+
+            // 不输出未处理的过的文件 和 单文件组件，即 .vue 文件
+            if (!file.allowRelease || file.isComponent) {
+                return false;
+            }
+
+            // 将所有文件的 src 路径前缀去掉
+            path = path.replace(/^src\//, '');
+            return path;
+        }
+    }
+}
+
+```
+
+### wx2swan
+`boolean` 将 微信小程序转成百度小程序，默认为 `false`
+
+* `boolean`, `true` 开启, `false` 不开启，只在构建类型为 `swan` 下有效，目前只是进行基础转换，支持内容[详见 wx2swan](component/transform.md?id=wx2swan)
+
 
 ### component
 `Object` 单文件组件的配置
@@ -190,11 +282,30 @@ module.exports = {
 * `component.extname`: `string` 组件的后缀名，默认 `okm`
 * `component.template`: `Object` 模板配置项
 * `component.template.useVuePrefix`: `boolean` `>= 0.4.6版本支持` 开启使用 `v-` 指令，默认 `false`, 具体使用详见[v- 指令支持](template/vueSyntax.md)
-* `component.template.transformTags`: `Object` 模板标签转换配置项，具体可以查看[标签转换](build/transformTag)
-* `component.global`: `Object` `>=0.4 版本支持` 自定义全局注入的组件
+* `component.template.transformTags`: `Object` 模板标签转换配置项，[详见标签转换](build/transformTag)
+* `component.global`: `Object` `>=0.4 版本支持` 自定义全局注入的组件，[具体可以参考特定平台代码](advance/platformSpecCode#组件)
+* `component.template.modelMap`: `Object` 自定义组件 `v-model` 配置项，[详见自定义配置v-model支持](template/v-model?id=自定义配置支持-v-model)
+    * 要求：
+        * [framework](build/index?id=framework) 配置了 `'model'` 此项配置才生效
+        * 版本: `okam-build >= 0.4.11`
+        * 版本: `okam-core >= 0.4.8`
+* `component.resourceTags`: `Object` `0.4.12 版本开始支持` 用于依赖资源信息收集的标签定义，默认会尝试从所有 `src` 属性获取本地的资源文件依赖，要求属性值不能使用变量形式，否则不能正确获取对应的依赖信息。
+
+```javascript
+{
+    component: {
+        template: {
+            myTag: 'myProp', // 自定义的依赖标签定义，会通过 myTag 的 myProp 获取依赖的资源
+            include: true, // 如果设为 true，默认通过 src 属性读取依赖信息
+            import: false // 如果设为 false，则不会读取该标签属性定义的依赖信息
+        }
+    }
+}
+```
+
 
 ### processors
-`Object|Array.<Object>` 自定义的构建处理器，这里定义的处理器，后续的处理规则 `rules` 里，可以直接通过处理器名称 `name` 直接引用，处理器定义包含如下选项
+`Object|Array.<Object>` 自定义的构建处理器，这里定义的处理器，后续的处理规则 `rules` 里，可以直接通过处理器名称 `name` 直接引用，处理器定义包含如下选项，该配置也可以重写 [内建的处理器及插件](build/processors) 选项。
 
 * `name`: `string` 处理器名称，也可以指定内建的处理器名称，用来重写某些配置
 * `processor`: `string|Function` 处理器 npm 包名、路径、或者实现（直接 require），也可以直接通过字符串形式引用 `builtin` 处理器，相当于定义了另外一个处理器，该处理器调用内建处理器

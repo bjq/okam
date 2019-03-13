@@ -24,6 +24,13 @@ module.exports = merge({}, baseConf, {
         ignore: /^@(system|service)\./, // 忽略快应用的内部系统模块的 resolve
 
         /**
+         * 增加 resolve 查找的后缀名
+         *
+         * @type {Array.<string>}
+         */
+        extensions: ['ux'],
+
+        /**
          * 收集需要导入声明的 API features
          * 默认不在 `notNeedDeclarationAPIFeatures` 该列表里且
          * `@system.` `@service.`开头的模块
@@ -74,7 +81,7 @@ module.exports = merge({}, baseConf, {
             }
 
             // do not output not processed file and component config file
-            if (!file.allowRelease || file.isComponentConfig) {
+            if (!file.allowRelease) {
                 return false;
             }
 
@@ -87,7 +94,28 @@ module.exports = merge({}, baseConf, {
         appBaseClass: null
     },
 
+    component: {
+        template: {
+            resourceTags: {
+                // 由于快应用不支持模板导入功能，页面组件路径可能会因为同一目录下存在
+                // 多个页面组件，而自动调整页面路径，为了避免 include/import 路径
+                // 重新计算找不到导入/引用的模板，这里不分析这两个标签定义的依赖资源
+                'include': false,
+                'import': false
+            },
+
+            transformTags: {
+                'button': 'o-button'
+            }
+        },
+        global: {
+            'o-button': 'okam/button/index'
+        }
+    },
+
     processors: {
+
+        // okam component parser
         component: {
             rext: 'ux',
             options: {
@@ -96,14 +124,17 @@ module.exports = merge({}, baseConf, {
             }
         },
 
-        cssImport: {
-            // using the existed postcss processor
-            processor: 'postcss',
-            extnames: ['css'],
-            rext: 'css',
+        // native quick component parser
+        quickComponent: {
+            rext: 'ux',
             options: {
-                plugins: ['cssImport']
+                parse: {pad: 'space'},
+                trim: true
             }
+        },
+
+        postcss: {
+            extnames: ['css']
         }
     },
 
@@ -116,9 +147,9 @@ module.exports = merge({}, baseConf, {
         },
         {
             match(file) {
-                return file.isEntryScript || file.isComponent;
+                return file.isEntryScript || file.isComponent || file.isNativeComponent;
             },
-            processors: ['componentGenerator']
+            processors: ['quickComponentGenerator']
         },
         {
             match(file) {

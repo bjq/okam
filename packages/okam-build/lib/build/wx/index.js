@@ -13,6 +13,13 @@ class BuildWxAppManager extends BuildManager {
     /**
      * @override
      */
+    getModulePathKeepExtnames() {
+        return ['.wxs'];
+    }
+
+    /**
+     * @override
+     */
     initProcessor(buildConf) {
         super.initProcessor(buildConf);
         updateReferProcessorInfo('filter', this.defaultBabelProcessorName);

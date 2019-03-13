@@ -6,14 +6,14 @@
         </view>
 
         <view for="item, index in items" :key="item.name" class="group-bd">
-            <view class="item border-bottom {{item.open ? '' : 'item-close'}}" @click="toggleClick" data-index="{{index}}" data-path="{{item.path}}">
+            <view class="item border-bottom {{item.open ? '' : 'item-close'}}" @click="toggleClick(index, item.path)">
                 <image class="item-logo" :src="item.icon"></image>
                 <text class="item-desc">{{item.name}}</text>
                 <image if="item.path" class="item-logo item-toggle" src="../../common/img/goto.png"></image>
                 <image else class="item-logo item-toggle" :src="item.open ? '../../common/img/close.png' : '../../common/img/open.png'"></image>
             </view>
             <view if="item.open">
-                <view class="sub-item border-bottom" for="subItem in item.list" :key="subItem.subName" @click="oneItemClick" data-path="{{subItem.path}}">
+                <view class="sub-item border-bottom" for="subItem in item.list" :key="subItem.subName" @click="oneItemClick(subItem.path)">
                     <text class="sub-item-desc">{{subItem.subName}}</text>
                     <image class="item-logo sub-item-goto" src="../../common/img/goto.png"></image>
                 </view>
@@ -123,6 +123,29 @@ export default {
                     {
                         subName: 'redux状态管理',
                         path: 'todos/todoList'
+                    },
+                    {
+                        subName: 'v-model属性',
+                        path: 'data/model',
+                    },
+                    {
+                        subName: 'v-html 支持',
+                        path: 'data/vhtml'
+                    }
+                ]
+            },
+            {
+                icon: '../../common/img/more.png',
+                name: '其他',
+                open: false,
+                list: [
+                    {
+                        subName: '单文件引入',
+                        path: 'sfc/index'
+                    },
+                    {
+                        subName: '单文件分开引入',
+                        path: 'sfc/separate'
                     }
                 ]
             }
@@ -131,16 +154,14 @@ export default {
 
     methods: {
 
-        oneItemClick(e) {
-            let viewPath = e.currentTarget.dataset.path;
+        oneItemClick(viewPath) {
             this.$api.navigateTo({
                 url: '/pages/' + viewPath
             });
         },
 
-        toggleClick(e) {
+        toggleClick(index, navPath) {
             // 无子项直接跳转
-            let navPath = e.currentTarget.dataset.path;
             if (navPath) {
                 this.$api.navigateTo({
                     url: '/pages/' + navPath
@@ -149,8 +170,7 @@ export default {
             }
 
             // 子项展开与收起
-            let items = this.data.items;
-            let index = e.currentTarget.dataset.index;
+            let items = this.items;
             // this.setData(`items[${index}].open`, !items[index].open)
             this.items.getItem(index).open = !items[index].open;
         }

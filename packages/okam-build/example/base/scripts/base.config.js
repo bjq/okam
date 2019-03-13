@@ -13,12 +13,22 @@ module.exports = {
     root: path.join(__dirname, '..'),
     output: {
         dir: 'dist',
-        depDir: 'src/common'
+        depDir: {
+            node_modules: 'src/common',
+            dep: 'src/common'
+        }
     },
     component: {
         extname: 'vue',
         template: {
             useVuePrefix: true,
+            modelMap: {
+                'sp-model-component': {
+                    event: 'spchange',
+                    prop: 'spvalue',
+                    detailProp: 'value'
+                }
+            },
             transformTags: {
                 div: 'view',
                 p: 'view',
@@ -70,6 +80,8 @@ module.exports = {
     framework: [
         'data',
         'watch',
+        'model',
+        'vhtml',
         ['behavior', '{useNativeBehavior: true}'],
         'broadcast',
         'redux',
@@ -77,11 +89,10 @@ module.exports = {
     ],
     designWidth: 375,
     resolve: {
-        alias: {
-            'okam$': 'okam-core/src/na',
-            'okam/': 'okam-core/src/na/',
-        },
-        // modules: ['node_modules', path.join(__dirname, '../src/common')]
+        // alias: {
+        //     'okam/': 'okam-core/src/na/',
+        // },
+        modules: ['node_modules', path.join(__dirname, '../dep')]
     },
     processors: {
         pug: {
